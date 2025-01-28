@@ -1,105 +1,90 @@
 import streamlit as st
-import time
-import os
-import sys
-sys.path.append("../../")
-import dotenv
-from openai import OpenAI  # type: ignore
+from pymongo import MongoClient
 
-# Cargar variables de entorno desde .env
-dotenv.load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+# Conexión a MongoDB
+def get_mongo_client():
+    uri = "mongodb://localhost:27017/"
+    client = MongoClient(uri)
+    return client
 
-# Verificar si la clave está configurada
-if not api_key:
-    st.error("No se encontró la clave de API en el archivo .env. Verifica la configuración.")
-    st.stop()
+# Obtener las colecciones de la base de datos
+def get_collections():
+    client = get_mongo_client()
+    db = client["wallapop"]
+    return db.list_collection_names()
 
-# Configurar cliente OpenAI
-cliente = OpenAI(api_key=api_key)
+# Obtener documentos de una colección
+def get_documents(collection_name):
+    client = get_mongo_client()
+    db = client["wallapop"]
+    collection = db[collection_name]
+    return list(collection.find().limit(20))  # Limitar a 20 documentos
 
-# ID del asistente (Especificado manualmente)
-assistant_id = "asst_SOmHiZ04bWxZcFsQKpIxe1CE"
+# Mostrar documentos con un diseño claro
+def mostrar_documentos(documentos):
+    for doc in documentos:
+        with st.container():
+            # Título
+            st.markdown(f"### 📦 {doc.get('title', 'Sin título')}")
+            
+            # Descripción
+            st.write(doc.get("description", "Sin descripción"))
+            
+            # Precio
+            price = doc.get("amount", "N/A")
+            currency = doc.get("currency", "")
+            st.write(f"💰 **Precio:** {price} {currency}")
+            
+            # Ubicación (solo campos relevantes)
+            location = doc.get("location", {})
+            city = location.get("city", "Sin ciudad")
+            region = location.get("region", "Sin región")
+            st.write(f"📍 **Ubicación:** {city}, {region}")
+            
+            # Categorías o taxonomía
+            taxonomy = doc.get("taxonomy", [])
+            if taxonomy:
+                categories = ", ".join([t.get("name", "Sin categoría") for t in taxonomy])
+                st.write(f"🏷️ **Categorías:** {categories}")
+            
+            # Estado de reservado y envío
+            reserved = doc.get("reserved", False)
+            shipping = doc.get("shipping", False)
+            st.write(f"🔒 **Reservado:** {'Sí' if reserved else 'No'}")
+            st.write(f"🚚 **Envío disponible:** {'Sí' if shipping else 'No'}")
+            
+            # Enlace al producto
+            url = doc.get("url_completa", "#")
+            st.markdown(f"🔗 [Ver más detalles]({url})")
+            
+            st.divider()  # Línea divisoria entre documentos
 
-# Título de la aplicación
-st.title("Asistente AI con OpenAI Assistants")
-st.write(f"Asistente seleccionado: {assistant_id}")
+# Aplicación principal
+def main():
+    st.title("Explorador de MongoDB - Wallapop")
 
-# Crear hilo
-try:
-    hilo = cliente.beta.threads.create()
-    thread_id = hilo.id
-    st.write("Se creó un hilo para esta conversación.")
-except Exception as e:
-    st.error(f"Error al crear el hilo: {e}")
-    st.stop()
+    # Obtener las colecciones
+    collections = get_collections()
 
-# Input del usuario
-mensaje = st.text_area("Escribe tu mensaje para el asistente:")
+    # Menú horizontal con botones
+    st.markdown("### Selecciona una colección:")
+    selected_collection = None
+    cols = st.columns(len(collections))  # Crear una columna por cada colección
 
-# Botón para enviar mensaje
-if st.button("Enviar mensaje"):
-    if mensaje.strip() == "":
-        st.warning("Por favor, escribe un mensaje antes de enviarlo.")
-    else:
-        st.write("Procesando tu mensaje...")
+    for col, collection in zip(cols, collections):
+        if col.button(collection):
+            selected_collection = collection
 
-        # Función para procesar datos
-        def process_data(openai_client, assistant_id, thread_id, message):
-            try:
-                # Enviar el mensaje al asistente
-                openai_client.beta.threads.messages.create(
-                    thread_id=thread_id,
-                    role="user",
-                    content=message,
-                )
-
-                # Ejecutar el hilo con el asistente
-                run = openai_client.beta.threads.runs.create(
-                    thread_id=thread_id,
-                    assistant_id=assistant_id
-                )
-
-                # Esperar a que se complete la ejecución
-                while True:
-                    run_status = openai_client.beta.threads.runs.retrieve(
-                        thread_id=thread_id,
-                        run_id=run.id
-                    )
-                    if run_status.status == "completed":
-                        st.success("Se completó exitosamente.")
-                        break
-                    elif run_status.status == "failed":
-                        st.error("Falló.")
-                        break
-                    else:
-                        st.write("Esperando a que se complete...")
-                        time.sleep(2)
-
-                # Obtener respuestas del asistente
-                response_messages = openai_client.beta.threads.messages.list(thread_id=thread_id)
-
-                assistant_response = None
-                for message in response_messages.data:
-                    if message.role == "assistant":
-                        assistant_response = "\n".join([block.text.value for block in message.content])
-                        break
-
-                if assistant_response:
-                    return assistant_response
-                else:
-                    return "No se encontró una respuesta del asistente."
-
-            except Exception as e:
-                st.error(f"Error al procesar los datos: {e}")
-                return None
-
-        # Procesar el mensaje
-        respuesta = process_data(cliente, assistant_id, thread_id, mensaje)
-
-        # Mostrar la respuesta
-        if respuesta:
-            st.write("### Respuesta del asistente:")
-            st.write(respuesta)
+    # Mostrar documentos de la colección seleccionada
+    if selected_collection:
+        st.subheader(f"Documentos en la colección: {selected_collection}")
+        documents = get_documents(selected_collection)
+        if documents:
+            mostrar_documentos(documents)
         else:
-            st.error("No se pudo obtener una respuesta del asistente.")
+            st.write("No hay documentos en esta colección.")
+    else:
+        st.write("Haz clic en una colección para explorarla.")
+
+if __name__ == "__main__":
+    main()
