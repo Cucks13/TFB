@@ -55,9 +55,15 @@ def procesar_productos(productos):
        
        resultados.append({
            "product_id": producto["id"],
-           "description": producto["description"],
-           "price": f"${producto['amount']}",
-           "score": puntaje_total
+            "user_id": producto["user_id"],
+            "description": producto["description"],
+            "price": f"{producto['amount']} {producto['currency']}",
+            "ciudad": producto["ciudad"],
+            "taxonomy": producto["taxonomy"],
+            "reservado": producto["reservado"],
+            "envio": producto["envio"],
+            "url_completa": producto["url_completa"],
+            "score": puntaje_total
        })
    return resultados
 
