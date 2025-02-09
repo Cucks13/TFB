@@ -1,0 +1,8 @@
+streamlit
+pandas
+requests
+pymongo
+dotenv
+openai
+plotly
+matplotlib
