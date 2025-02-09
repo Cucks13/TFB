@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  etl:
+    build: ./etl
+    container_name: etl_pipeline
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - mongo
+    networks:
+      - shared_network
+    command: ["python", "main.py"]
+
+  mongo:
+    image: mongo:5.0
+    container_name: etl_mongo
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: etl_db
+    ports:
+      - "27017:27017"
+    networks:
+      - shared_network
+    volumes:
+      - mongo_data:/data/db
+
+  mongo-express:
+    image: mongo-express
+    container_name: etl_mongo_express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo
+    networks:
+      - shared_network
+
+  streamlit:
+    build: ./streamlit
+    container_name: streamlit_app
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+
+volumes:
+  mongo_data:
