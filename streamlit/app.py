@@ -5,25 +5,20 @@ import pandas as pd
 import os
 import time
 from openai import OpenAI
-
 # Cargar variables de entorno desde .env
 dotenv.load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
-
 # Verificar si la clave de API es válida
 if not api_key:
     st.error("No se encontró la clave de API en el archivo .env. Verifica la configuración.")
     st.stop()
-
 # Configurar cliente OpenAI
 cliente = OpenAI(api_key=api_key)
-
 # Conexión a MongoDB
 def get_mongo_client():
     uri = "mongodb://localhost:27017/"  # Cambia esto si usas una URI remota (e.g., MongoDB Atlas)
     client = MongoClient(uri)
     return client
-
 # Obtener las colecciones de la base de datos
 def get_collections():
     try:
@@ -33,7 +28,6 @@ def get_collections():
     except Exception as e:
         st.error(f"Error al conectar con MongoDB: {e}")
         return []
-
 # Obtener documentos de una colección y ordenarlos por score de mayor a menor
 def get_documents(collection_name):
     try:
@@ -44,7 +38,6 @@ def get_documents(collection_name):
     except Exception as e:
         st.error(f"Error al obtener documentos de la colección '{collection_name}': {e}")
         return []
-
 # Mostrar documentos básicos en contenedores
 def mostrar_documentos_basicos(documentos):
     for doc in documentos:
@@ -60,16 +53,13 @@ def mostrar_documentos_basicos(documentos):
             else:
                 st.write("- **Enlace:** No disponible")
             st.divider()
-
 # Chatbot simple con OpenAI sin asistente
 def chatbot_interface_simple(df, collection_name):
     st.markdown("### 🤖 Chatbot")
     st.write("Hazme preguntas sobre la colección o productos.")
-
     # Contexto adicional del dataset y colección
     context_data = f"Análisis de la colección: {collection_name}\n\nDatos:\n{df.head().to_string()}"
     mensaje = st.text_area("Escribe tu mensaje para el chatbot:")
-
     # Botón para enviar mensaje
     if st.button("Enviar mensaje"):
         if mensaje.strip() == "":
@@ -79,9 +69,7 @@ def chatbot_interface_simple(df, collection_name):
             prompt = f"""
 Datos de la colección seleccionada:
 {context_data}
-
 Pregunta del usuario: {mensaje}
-
 Por favor, responde de manera precisa y basada en los datos proporcionados.
 """
             try:
@@ -98,31 +86,25 @@ Por favor, responde de manera precisa y basada en los datos proporcionados.
                 st.write(respuesta)
             except Exception as e:
                 st.error(f"Error al procesar los datos: {e}")
-
 # Aplicación principal
 def main():
     st.set_page_config(layout="wide", page_title="Explorador de MongoDB con Chatbot")
-    st.title("Explorador de MongoDB - Wallapop")
-
+    st.title("Wallapop - Product search")
     # Sidebar: Menú de categorías como botones
     st.sidebar.title("Categorías")
     collections = get_collections()
     if not collections:
         st.sidebar.warning("No se encontraron colecciones en la base de datos.")
         return
-
     selected_collection = None
     for collection in collections:
         friendly_name = collection.replace("data_", "").replace("_", " ").capitalize()
         if st.sidebar.button(friendly_name):
             selected_collection = collection
-
     # Selección de colección
     selected_collection = st.sidebar.radio("Selecciona una categoría:", collections)
-
     # Dividir pantalla en dos columnas (productos y chatbot)
     col1, col2 = st.columns([3, 2])  # Ajustar proporciones para más espacio al chatbot
-
     # Mostrar productos en col1
     with col1:
         if selected_collection:
@@ -134,7 +116,6 @@ def main():
                 st.warning("No hay documentos en esta colección.")
         else:
             st.write("Selecciona una categoría en el menú lateral para explorar.")
-
     # Mostrar chatbot en col2
     with col2:
         if selected_collection:
@@ -142,6 +123,5 @@ def main():
             chatbot_interface_simple(df, selected_collection)
         else:
             st.write("Selecciona una categoría para interactuar con el chatbot.")
-
 if __name__ == "__main__":
     main()
